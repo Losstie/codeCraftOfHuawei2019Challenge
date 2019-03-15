@@ -5,11 +5,11 @@ Created on 2019/3/11 下午6:45
 @author: Evan Chen
 """
 import networkx as nx
-from ch_version.car import Car
-from ch_version.cross import Cross
-from ch_version.road import Road
-from ch_version.utils import load_entities
-from ch_version.scheduler import Scheduler
+from car import Car
+from cross import Cross
+from road import Road
+from utils import load_entities
+from scheduler import Scheduler
 from matplotlib import pyplot as plt
 
 

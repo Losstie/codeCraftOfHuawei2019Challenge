@@ -4,7 +4,7 @@ Created on 2019/3/14 上午10:19
 
 @author: Evan Chen
 """
-from ch_version.utils import direct_relat_other
+from utils import direct_relat_other
 
 
 class Cross():
