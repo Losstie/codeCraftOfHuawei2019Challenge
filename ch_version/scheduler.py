@@ -5,7 +5,6 @@ Created on 2019/3/13 下午1:55
 @author: Evan Chen
 """
 from datetime import datetime
-import numpy as np
 from functools import reduce
 
 
