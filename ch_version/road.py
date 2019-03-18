@@ -8,7 +8,7 @@ from math import ceil
 
 
 class Road():
-    def __init__(self, roud_id, length, v, lane_num, cross_1, cross_2, two_way):
+    def __init__(self, roud_id, length, v_limit, lane_num, cross_1, cross_2, two_way):
         """
         :param roud_id: 道路唯一标识
         :param length: 道路长度
@@ -19,103 +19,188 @@ class Road():
         :param two_way: 道路是否为双向道路
         """
         # 固定属性
-        self.v = v
+        self.v_limit = int(v_limit)
         self.len = int(length)
         self.cross_1 = int(cross_1)
         self.cross_2 = int(cross_2)
         self.road_id = int(roud_id)
         self.lane_num = int(lane_num)
         self.two_way = True if int(two_way) == 1 else False
-        self.num_moment = 0  # 当前所处时刻
 
-        # 初始化车道对象, cross_id -> di_lane, 对应出口为cross_id的所有车道
-        self.di_lanes_dict = dict()
-        self.di_lanes_dict[self.cross_2] = DiLane(self.road_id, lane_num, self.len, v)
+        # 存储单向道路信息
+        self.di_roads = list()
+        self.di_roads.append(DiRoad(self.lane_num, self.len, self.v_limit))
         if self.two_way:
-            self.di_lanes_dict[self.cross_1] = DiLane(self.road_id, lane_num, self.len, v)
+            self.di_roads.append(DiRoad(self.lane_num, self.len, self.v_limit))
 
-    def run_moment(self, graph):
+    def run_moment(self):
         """
         运动一个时刻，改变所有道路上的小车状态
         """
-        for lanes in self.di_lanes_dict.values():
-            lanes.run(graph)
+        for di_road in self.di_roads:
+            di_road.run()
+
+    def push_a_car(self, car, cross_id):
+        """
+        针对需要进入的车， 改变其道路相关属性
+        调用该函数时，小车一定可以进入该道路
+        :param car:
+         :return: True or False, info {'road limit', 'other'}
+        """
+        di_road = self.get_di_road(cross_id, 'import')
+
+        # 小车若进入该道路，则需要行驶的距离
+        # 若需要行驶的距离小于0，则将小车行驶至车道路口，等待下次进入该路口
+        run_dist = self.v_limit - car.access_dis
+        if run_dist <= 0:
+            return False, 'road limit'
+
+        is_success, info = di_road.push(car, run_dist)
+        if is_success:
+            # car.loc = self.cross_1 if cross_id == self.cross_1 else self.cross_2
+            car.stat = 'finial'
+            car.next_cross_id = None
+            car.lane_left = self.len - run_dist
+            car.v = min(car.v_max, self.v_limit)
+        return is_success, info
+
+    def pull_a_car(self, car, cross_id):
+        """
+        :param car:
+        :param cross_id:
+        :return:
+        """
+        di_road = self.get_di_road(cross_id, 'export')
+        di_road.pull(car)
+
+    def get_di_road(self, cross_id, direct='export'):
+        """
+        获取单向道路信息
+        direct=='export', cross_id 为单向道路的出口
+        direct=='import', cross_id 为单向道路的入口
+        :return:
+        """
+        if direct == 'export':
+            if cross_id == self.cross_2:
+                return self.di_roads[0]
+            else:
+                if self.two_way:
+                    return self.di_roads[1]
+                return None
+        else:
+            if cross_id == self.cross_1:
+                return self.di_roads[0]
+            else:
+                if self.two_way:
+                    return self.di_roads[1]
+                return None
+
+    def weight_in_graph(self, cross_id):
+        if cross_id == self.cross_1:
+            return self.di_roads[0].di_rweight_in_graph
+        else:
+            return self.di_roads[1].di_rweight_in_graph
 
 
-class DiLane():
+class DiRoad():
     """
-    单个方向车道类
+    单个方向道路类
     """
 
-    def __init__(self, road_id, lane_num, lane_len, v_max):
+    def __init__(self, lane_num, lane_len, v_max):
         """
         :param lane_num:  车道数量
         :param v_max:  车道最高限速
         """
-        self.road_id = road_id
         self.lane_len = lane_len
-        self.lanes = [list() for _ in lane_num]  # (priority, car)
+        self.lane_num = lane_num
+        self.highest_prior_cars = [None for _ in range(self.lane_num)]  # 存放每条车道优先级最高的车, 每个元素包含一个双向循环链表
         self.v_max = v_max
 
-        self.driveable_lane_id = 0  # 当前可行的车道id
-        self.driveable_lane_dis = 0  # 当前可行车道上，可行驶的距离
-        self.priority = 0  # 该道路走最后一辆小车的优先级
-
-    def push_a_car(self, car):
-        """ 按照优先级顺序，将一辆小车放入车道中, 并且更新小车信息 """
-        car.stat = 'finial'
-        driveable_lane = self.lanes[self.driveable_lane_id]
-
-        car.v = min(car.v_max, self.v_max)
-        car.road_id = self.road_id
-        car.lane_id = self.driveable_lane_id
-        car.lane_dis = self.driveable_lane_dis - 1
-        car.next_car = None if len(driveable_lane) == 0 else driveable_lane[0]
-        car.lane_left = self.lane_len if car.next_car is None else car.next_car.lane_dis - (car.lane_dis + 1)
-
-        car.behind_car = None
-        car.next_road_id = None
-        car.next_cross_id = None
-        driveable_lane.insert(0, car)
-
-    def pull_a_car(self, car):
-        """ 选择一辆车，将一辆小车从车道中拿出，并更新身后小车信息 """
-        car.behind_car.lane_left += car.lane_left + 1
-        car.behind_car.next_car = None
-        self.lanes[car.lane_id].pop(-1)
-
-    def accessable(self, car):
+    def pull(self, car):
         """
-        判断小车是否可进入，并更新：
-        self.driveable_lane_id， self.driveable_lane_dis
-        :param car: 需要进入的小车
-        :return: True or False, info
-        """
-        v2 = min(car.v, self.v_max)
-        for idx, lane in enumerate(self.lanes):
-            last_car = lane[0]
-            driveable_dis = self.lane_len if len(lane) == 0 else last_car.lane_dis
-            s2 = v2 - car.lane_dis
-            if s2 <= 0 or s2 > driveable_dis:
-                if last_car.stat == 'wait':
-                    return False, 'cart wait'
-            self.driveable_lane_id = idx
-            self.driveable_lane_dis = s2
-            return True, 'access'
-        return False, 'road limit'
-
-    def current_v_max(self):
-        """
-        第一条可行驶车道上，最后一辆车的速度
-        用于计算图中边的权重
+        将小车从该车道拿出
+        :param car:
         :return:
         """
-        pass
+        # 更新当前车道优先级最高的车辆
+        idx = self.highest_prior_cars.index(car)
+        self.highest_prior_cars[idx] = car.behind_car
 
-    def run(self, graph):
-        for car in [c for lane in self.lanes for c in reversed(lane)]:
-            car.stat = 'wait'  # 将所有小车标记为待行驶状态
-            car.updata_stat(graph)
+        # 封闭下一条道路的双向循环链表
+        car_id = car.car_id
+        current_car = car.next_car
+        while current_car.car_id != car_id:
+            current_car = current_car.next_car
+        car.behind_car = current_car
+
+    def push(self, car, run_dist):
+        """
+         判断小车是否可进入，若可进入则更新小车状态
+         若不可进入，则返回失败信息
+        :param car: 需要进入的小车
+        :param run_dist: 进入当前道路需要行驶的最小距离
+        :return: True or False, info
+        """
+        lane_mark, last_car = 0, None
+        is_success, info = False, 'road limit'
+        for lane_id, hp_car in enumerate(self.highest_prior_cars):
+            if hp_car is None: # 讲道理，车单位时间内，应该不会直接通过整个路段
+                lane_mark = lane_id
+                is_success = True
+                info = 'suceess'
+                break
+            last_car = hp_car.next_car
+            if run_dist <= last_car.lane_dis:
+                lane_mark = lane_id
+                hp_car.next_car = car
+                is_success = True
+                last_car = hp_car
+                info = 'suceess'
+                break
+            else:
+                if last_car.stat == 'wait':
+                    is_success = False
+                    info = 'other'
+                    break
+
+        if not is_success:
+            return is_success, info
+
+        car.run_out_current_road()
+
+        if last_car is None:
+            car.access_dis = self.lane_len - run_dist
+            last_car = car
+        else:
+            car.access_dis = car.next_car.lane_dis - car.lane_dis - 1
+
+        car.lane_dis = run_dist - 1
+        car.next_car = last_car
+        hp_car = last_car.behind_car
+        hp_car.next_car = car
+        last_car.behind_car = car
+
+        self.highest_prior_cars[lane_mark] = hp_car
+        return is_success, info
+
+    def run(self):
+        # 调度每一个车道中的小车
+        for hp_car in self.highest_prior_cars:
+            if hp_car is None:
+                continue
+
+            # 将每一辆小车标记为 wait 状态
+            hp_car.stat = 'wait'
+            header_id = hp_car.car_id
+            current_car = hp_car.behind_car
+            while current_car.car_id != header_id:
+                current_car.stat = 'wait'
+                current_car = current_car.behind_car
+
+            # 开始调度
+            hp_car.update_stat()
+            hp_car.schedule_behind_car()
 
     @property
     def scheduler_queue(self):
@@ -127,21 +212,36 @@ class DiLane():
         :return:
         """
         sche_q = list()
-        # [(idx, lane)], idx 为lane 中参与优先级评选小车的下标
-        lanes_not_empty = list(map(lambda x: (len(x) - 1, x), filter(lambda x: len(x) != 0, self.lanes)))
-        time_consume = [(idx, ceil(l[car_idx].lane_left / l[car_idx].v), l[car_idx])
-                        for idx, car_idx, l in enumerate(lanes_not_empty)]
-        compared_car_num = len(lanes_not_empty)
-        while compared_car_num != 0:
-            lane_idx, tc, car = min(time_consume, key=lambda x: (x[1], x[0]))
-            # 更新车道中参与优先级评比的小车信息
-            if lanes_not_empty[lane_idx][0] -1 < 0:
-                compared_car_num -= 1
-                time_consume[lane_idx][1] = 100
-            else:
-                lanes_not_empty[lane_idx][0] -= 1
-                car_idx, l = lanes_not_empty[lane_idx]
-                updaed_lan_left = l[car_idx].lane_left + car.lane_left +1
-                time_consume[lane_idx] = (lane_idx, ceil(updaed_lan_left/ l[car_idx].v), l[car_idx])
+        lane_ls = [(idx, car) for idx, car in enumerate(self.highest_prior_cars)]
+        # print(self.highest_prior_cars)
+        while sum(map(lambda x: 1 if not x[1] is None else 0, lane_ls)) != 0:
+            # 速度最快的优先级最高，若同一时刻到达，则车道编号小的先到达
+            not_none = filter(lambda x: not x[1] is None, lane_ls)
+            idx, car = min(not_none, key=lambda x: (ceil(x[1].lane_left / x[1].v), x[0]))
+            if car.stat == 'finial':
+                lane_ls[idx] = (idx, None)
+                continue
+
+            lane_ls[idx] = (idx, car.next_car)
             sche_q.append(car)
+
+            if car.next_car.car_id == car.car_id:
+                lane_ls[idx] = (idx, None)
+                continue
+
+        # print('sche_q:', sche_q)
+        if len(sche_q) !=0 :
+            print( '' )
         return sche_q
+
+    @property
+    def di_rweight_in_graph(self):
+        """
+        该条道路，最后一辆车的行驶均速
+        用于计算图中边的权重
+        :return:
+        """
+        # all_v = sum([car.next_car.v for car in self.highest_prior_cars])
+        # lane_num = len(self.highest_prior_cars)
+        # return all_v / lane_num
+        return self.lane_len

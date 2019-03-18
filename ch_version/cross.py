@@ -4,7 +4,7 @@ Created on 2019/3/14 上午10:19
 
 @author: Evan Chen
 """
-from ch_version.utils import direct_relat_other
+from utils import direct_relat_other
 
 
 class Cross():
@@ -32,107 +32,107 @@ class Cross():
         # 神奇车库，未出发，已到达的车辆将会被放入
         self.magic_garage = [list(), list()]  # 待出行，已到达
 
-    def push_into_garage(self, stat, *cars):
-        if stat == 'active':
-            # 待出发车辆仅会被初始化时放入
-            self.magic_garage[0] = sorted(list(cars), key=lambda x: (x.sche_time, x.car_id))
-        else:
-            self.magic_garage[1] += list(cars)
-
-    def run_a_time(self):
+    def run_a_time(self, current_moment):
         """
         调度处于等待行驶状态的车辆，并且通过路口时符合交通规则
         每一个路口需要多次调度才可以运行一个时间片段
         :return: 1.当前路口是否存在未调度车辆：{True, False}  2.本次运行抵达该路口有多少辆
         """
+        # 所有出口为当前路口的单向道路
+        export_road = list()
+        for road in self.roads_dict.values():
+            di_road = road.get_di_road(self.id, direct='export')
+            if di_road is None:
+                continue
+            export_road.append((road.road_id, di_road))
+
+        # 每一条道路对应的非空调度序列
+        # (road_id, export_road_sche_queue)
+        road_queues = list(filter(lambda x: len(x[1]) != 0, map(lambda x: (x[0],x[1].scheduler_queue), export_road)))
+        all_queues_num = len(road_queues)
+
+        if all_queues_num == 0: # 没有调度的车辆
+            return False, 0
+
+        has_wait_car, arrived_cars_num = self.__run(all_queues_num, road_queues, current_moment)
+        return has_wait_car, arrived_cars_num
+
+    def __run(self, all_queues_num, road_queues, current_moment):
+        print('self_id', self.id)
         arrived_cars_num = 0
-        # 完成全部调度的车道
-        finished_lane_ls = list()
-        # 无法调度的车道
-        conflict_lane_ls = list()
+        finished_lane_ls = list()  # 完成调度的车道
+        conflict_lane_ls = list()  # 因其他车道未调度，导致当前无法调度的车道
 
-        # 每条出口道路对应的调度序列
-        export_lanes = [road.di_lanes_dict.get(self.id, None) for road in self.roads_dict.values()]  # 可能报错，存在单向道路
-        lane_queues = list(filter(lambda x: len(x) != 0,
-                                  [list(lane.scheduler_queue) if not lane is None else [] for lane in export_lanes]))
-        lane_num = len(lane_queues)
         # 每一个出口道路对应的优先级最高的车辆
-        first_order_car = [q[0] for q in lane_queues]
-
+        first_order_car = [q[0] for _, q in road_queues]
         has_movable_car = True  # 是否有可动的车辆
         while has_movable_car:
-            for lane_idx, queue in enumerate(lane_queues):
+            for idx, road_queue in enumerate(road_queues):
+                road_id, queue = road_queue
+
                 # 如果队列为空，则说明全部调度完毕
                 if len(queue) == 0:
-                    finished_lane_ls.append(lane_idx)
+                    print('None queue')
+                    finished_lane_ls.append(idx)
                     continue
 
                 # 如果已经调度完成或者处于冲突状态，则不需要在调度
-                if lane_idx in conflict_lane_ls + finished_lane_ls:
+                if idx in conflict_lane_ls + finished_lane_ls:
+                    print('conflict')
                     continue
 
                 for car in queue:
                     if car.stat == 'finial':
+                        print('fininal')
                         queue.remove(car)
                         continue
 
                     # 到达目标路口
                     if self.id == car.dest:
+                        print('arrive')
+                        car.real_time = current_moment
                         # 将小车从车道中拿出, 更新 后方 车辆可行驶距离信息, 放入神奇车库
-                        export_lanes[lane_idx].pull_a_car(car)
+                        car.run_out_current_road()
                         self.magic_garage[1].append(car)
                         arrived_cars_num += 1
                         queue.remove(car)  # 将小车从调度队列中移除
+                        self.roads_dict[road_id].pull_a_car(car)
                         continue
 
-                    # 小车直行
-                    if car.next_cross_id is None:
-                        car.update_stat()
-                        queue.remove(car)  # 将小车从调度队列中移除
-                        continue
-
-                    # 不是调度下一个路口，而是调度发生冲突的那个路口 ！！！！！！
-                    # 小车需要通过路口， 若存在冲突则调度下一条道路,
-                    if self.has_conflict(lane_idx, first_order_car):
-                        # 更新该车道，优先级最高车辆的信息
-                        first_order_car[lane_idx] = car
+                    # 当前小车为该车道优先级最高的车辆
+                    # 检测小车是否能通过路口, 若不能，则调度其他路口
+                    first_order_car[idx] = car
+                    if self.has_conflict(idx, first_order_car):
                         break
-
-                    # # 获取下一条道路信息
-                    # next_road = self.roads_dict[car.next_road_id]
-                    # next_cross = next_road.cross_1 if next_road.cross_1 != self.id else next_road.cross_2
-                    # next_lane = next_road.di_lanes_dict[next_cross]
-
-                    # 获取下一条道路信息
-                    next_cross = car.next_cross_id
-                    for road in self.roads_dict.values():
-                        if next_cross in [road.cross_1, road.cross_2]:
-                            next_lane = road.di_lanes_dict[next_cross]
-
-                    # 若道路可进入
-                    is_access, info = next_lane.accessable(car)
-                    if is_access:
-                        # 将小车从车道中拿出, 更新后方车辆可行驶距离信息,放入下一条车道
-                        export_lanes[lane_idx].pull_a_car(car)
-                        next_lane.push_a_car(car)
-
-                        queue.remove(car)  # 将小车从调度队列中移除
-                    elif info == 'road limit':
-                        # 将小车行驶至路口，等待下一个时间片段调度
-                        car.run_to_edge()
-                        queue.remove(car)
                     else:
-                        # 因为其他路口未被调度，或者发生死锁现象
-                        # 导致车辆需要行驶的车道容量不足
-                        # 由于该条车道优先级最高的车辆无法通行
-                        # 导致同一车道其他车辆也无法通行，因此该车道不在参与当前调度
-                        # 当前调度结束后，需要重新调度所有路口
-                        conflict_lane_ls.append(lane_idx)
+                        # 获取下一条道路信息
+                        print('进入下一条道路', car.next_cross_id)
+                        next_road = None
+                        next_cross = car.next_cross_id # 这里的小车一定会过路口，因此会有这个属性
+                        for road in self.roads_dict.values():
+                            if next_cross in [road.cross_1, road.cross_2]:
+                                next_road = road
+                        #print('self_id', self.id)
+                        try:
+                            is_success, info = next_road.push_a_car(car, self.id)
+                        except:
+                            # print('self_id', self.id,)
+                            print(car)
 
-            # 路口出的车道是否处于 发生冲突 或 完成调度 的状态
+                        if is_success:
+                            # print('mark')
+                            # car.loc = self.id
+                            queue.remove(car)
+                            self.roads_dict[road_id].pull_a_car(car, self.id)
+                        elif info == 'road limit':
+                            car.run_to_edge()
+                            queue.remove(car)
+                        else:
+                            conflict_lane_ls.append(idx)
+
             finished_lane_num = len(finished_lane_ls)
             conflict_lane_num = len(conflict_lane_ls)
-            if finished_lane_num + conflict_lane_num == lane_num:
+            if finished_lane_num + conflict_lane_num == all_queues_num:
                 has_movable_car = False
             else:
                 has_movable_car = True
@@ -147,22 +147,23 @@ class Cross():
         :param first_order_car:  各个路口中优先级最高的车辆
         :return: True or False， True: 当前小车不可行， False:当前小车可行
         """
-        dir_ls = list(map(lambda x: self.direct_dict[x],
-                          [(car.road_id, car.next_road_id) for car in first_order_car]))
-        aim_car_dir = dir_ls[idx]
-        dir_ls.pop(idx)
-        if aim_car_dir == 'straight':  # 小车直行则不发生冲突
-            return False
-        elif 'straight' in dir_ls:  # 小车左转或右转，但是其他车辆存在直行，则发生冲突
-            return True
-        elif aim_car_dir == 'left':  # 小车左转，其他车辆没有直行，则不会发生冲突
-            return False
-        elif 'left' in dir_ls:  # 小车右转，但其他车辆具有左转，则发生冲突
-            return True
-        else:  # 小车右转，其他车辆都右转，则不会发生冲突
-            return False
+        # dir_ls = list(map(lambda x: self.direct_dict[x],
+        #                   [(car.road_id, car.next_road_id) for car in first_order_car]))
+        # aim_car_dir = dir_ls[idx]
+        # dir_ls.pop(idx)
+        # if aim_car_dir == 'straight':  # 小车直行则不发生冲突
+        #     return False
+        # elif 'straight' in dir_ls:  # 小车左转或右转，但是其他车辆存在直行，则发生冲突
+        #     return True
+        # elif aim_car_dir == 'left':  # 小车左转，其他车辆没有直行，则不会发生冲突
+        #     return False
+        # elif 'left' in dir_ls:  # 小车右转，但其他车辆具有左转，则发生冲突
+        #     return True
+        # else:  # 小车右转，其他车辆都右转，则不会发生冲突
+        #     return False
+        return False
 
-    def run_car_in_magic_garage(self, moment, graph):
+    def run_car_in_magic_garage(self, moment):
         """
         调度当前时刻，神奇车库中可以出发的小车
         :param moment: 当前时刻
@@ -171,18 +172,18 @@ class Cross():
         """
         for car in self.magic_garage[0]:
             if car.sche_time <= moment:
-                car.update_route(graph, update=False)
+                car.update_route()
 
-                next_cross = car.next_cross_id
+                # 获取下一条道路信息
+                next_road = None
+                next_cross = car.next_cross_id  # 这里的小车一定会过路口，因此会有这个属性
                 for road in self.roads_dict.values():
                     if next_cross in [road.cross_1, road.cross_2]:
-                        next_lane = road.di_lanes_dict[next_cross]
+                        next_road = road
 
-                is_access, info = next_lane.accessable(car)
-                if is_access:
-                    # 将小车从车道中拿出, 更新后方车辆可行驶距离信息,放入下一条车道
-                    next_lane.push_a_car(car)
-                    graph[car.loc][car.next_cross_id]['weight'] = car.v
+                is_success, info = next_road.push_a_car(car, self.id)
+                if is_success:
+                    self.magic_garage[0].remove(car)
                 else:
                     continue
             else:
