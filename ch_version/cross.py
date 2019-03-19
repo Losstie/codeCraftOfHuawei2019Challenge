@@ -172,6 +172,7 @@ class Cross():
                 is_success, info = next_road.push_a_car(car, self.id)
                 if is_success:
                     car.real_time = moment # 记录实际出发时间
+                    print(car,"start")
                     self.magic_garage[0].remove(car)
                 else:
                     continue
