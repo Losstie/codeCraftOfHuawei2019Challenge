@@ -5,6 +5,7 @@ Created on 2019/3/14 上午10:19
 @author: Evan Chen
 """
 from math import ceil
+import time
 
 
 class Road():
@@ -57,11 +58,13 @@ class Road():
 
         is_success, info = di_road.push(car, run_dist)
         if is_success:
-            # car.loc = self.cross_1 if cross_id == self.cross_1 else self.cross_2
             car.stat = 'finial'
+            car.road_id = self.road_id
             car.next_cross_id = None
             car.lane_left = self.len - run_dist
             car.v = min(car.v_max, self.v_limit)
+            car.before_cross_id = car.loc
+            car.loc = self.cross_2 if cross_id == self.cross_1 else self.cross_1
         return is_success, info
 
     def pull_a_car(self, car, cross_id):
@@ -118,21 +121,24 @@ class DiRoad():
         self.v_max = v_max
 
     def pull(self, car):
-        """
-        将小车从该车道拿出
-        :param car:
-        :return:
-        """
-        # 更新当前车道优先级最高的车辆
+        # 小车即将行驶进入下一个路口，这里调整当前道路优先级最高的车辆
         idx = self.highest_prior_cars.index(car)
-        self.highest_prior_cars[idx] = car.behind_car
+        new_hp_car = car.behind_car if car.behind_car.car_id != car.car_id else None
+        self.highest_prior_cars[idx] = new_hp_car
+
+        # 封闭当前道路的双向链表
+        if not new_hp_car is None:
+            last_car = new_hp_car
+            while last_car.next_car.car_id != car.car_id:
+                last_car = last_car.next_car
+            new_hp_car.next_car = last_car
+            last_car.behind_car = new_hp_car
 
         # 封闭下一条道路的双向循环链表
-        car_id = car.car_id
-        current_car = car.next_car
-        while current_car.car_id != car_id:
-            current_car = current_car.next_car
-        car.behind_car = current_car
+        next_road_hp_car = car
+        while next_road_hp_car.next_car.car_id != car.car_id:
+            next_road_hp_car = next_road_hp_car.next_car
+        car.behind_car = next_road_hp_car
 
     def push(self, car, run_dist):
         """
@@ -145,7 +151,7 @@ class DiRoad():
         lane_mark, last_car = 0, None
         is_success, info = False, 'road limit'
         for lane_id, hp_car in enumerate(self.highest_prior_cars):
-            if hp_car is None: # 讲道理，车单位时间内，应该不会直接通过整个路段
+            if hp_car is None:  # 讲道理，车单位时间内，应该不会直接通过整个路段
                 lane_mark = lane_id
                 is_success = True
                 info = 'suceess'
@@ -153,9 +159,7 @@ class DiRoad():
             last_car = hp_car.next_car
             if run_dist <= last_car.lane_dis:
                 lane_mark = lane_id
-                hp_car.next_car = car
                 is_success = True
-                last_car = hp_car
                 info = 'suceess'
                 break
             else:
@@ -175,9 +179,11 @@ class DiRoad():
         else:
             car.access_dis = car.next_car.lane_dis - car.lane_dis - 1
 
+        hp_car = last_car.behind_car if last_car.car_id != car.car_id else car
+
         car.lane_dis = run_dist - 1
         car.next_car = last_car
-        hp_car = last_car.behind_car
+
         hp_car.next_car = car
         last_car.behind_car = car
 
@@ -194,9 +200,15 @@ class DiRoad():
             hp_car.stat = 'wait'
             header_id = hp_car.car_id
             current_car = hp_car.behind_car
+            print('start')
+            s = time.time()
             while current_car.car_id != header_id:
                 current_car.stat = 'wait'
                 current_car = current_car.behind_car
+                e = time.time()
+                if e - s > 3:
+                    print(' ')
+            print('end')
 
             # 开始调度
             hp_car.update_stat()
@@ -213,7 +225,6 @@ class DiRoad():
         """
         sche_q = list()
         lane_ls = [(idx, car) for idx, car in enumerate(self.highest_prior_cars)]
-        # print(self.highest_prior_cars)
         while sum(map(lambda x: 1 if not x[1] is None else 0, lane_ls)) != 0:
             # 速度最快的优先级最高，若同一时刻到达，则车道编号小的先到达
             not_none = filter(lambda x: not x[1] is None, lane_ls)
@@ -229,9 +240,6 @@ class DiRoad():
                 lane_ls[idx] = (idx, None)
                 continue
 
-        # print('sche_q:', sche_q)
-        if len(sche_q) !=0 :
-            print( '' )
         return sche_q
 
     @property
