@@ -24,6 +24,7 @@ class Car():
         self.car_id = car_id
         self.sche_time = int(sche_time)
         self.real_time = int(sche_time)  # 小车实际出发时间
+        self.arrive_time = None # 小车到达目的地时间
 
         # 动态属性
         self.path = list([self.loc])  # 记录经过的路径
