@@ -38,67 +38,32 @@ def direct_relat_other(cross_id, roads_enumer):
 
     return direct_dict
 
+def direct_relat_other_test(cross_id, roads_enumer):
+    roads = list(filter(lambda x: x[1] is not None, roads_enumer))
+    crosses = list(map(lambda x: (x[0],conver_to_cross(cross_id, x[1])), roads))
 
-def load_entities(_class, path, road_dict=None, car_dict=None):
+    direct_dict = dict()
+    for l1, c1 in crosses:
+        for l2, c2 in crosses:
+            if c1 == c2:
+                continue
+
+            if (l1, l2) in [(1, 4), (4, 3), (3, 2), (2, 1)]:
+                direct_dict[(c1, c2)] = 'right'
+            elif (l1, l2) in [(4, 1), (3, 4), (2, 3), (1, 2)]:
+                direct_dict[(c1, c2)] = 'left'
+            else:
+                direct_dict[(c1, c2)] = 'straight'
+    return direct_dict
+
+def conver_to_cross(cross_id, road):
     """
-    加载文件数据，并将数据转化为对应的数据类型
-    :param _class: 类名
-    :param path: 文件路径
-    :return: 实体映射字典，实体id -> 实体
+    cross_id -> road 所属方向
+    :param cross_id:
+    :param road:
+    :return:
     """
-    entity_map = dict()
-    with open(path) as file:
-        lines = file.readlines()
-        g = map(lambda x: x.strip('#()\n').split(','), lines)
-        for entity_str in g:
-            if 'id' in entity_str: continue  # remove header
-
-            if road_dict is None:  # 加载汽车、道路实体
-                entity = _class(*entity_str)
-                id = entity_str[0]
-                entity_map[id] = entity
-            else:  # 加载与路口对应的 Commander 实体
-                id = entity_str[0]
-                roads = list(map(lambda x: road_dict.get(x), entity_str[1:]))
-                entity_map[id] = _class(id, *roads)
-                cars = [(car, 'active') if car.loc == id else None for car in car_dict.values()]
-                entity_map[id].push_into_garage('active',
-                                                *filter(lambda x: x is not None, cars))  # 将未出发的汽车放入magic_garage
-
-    return entity_map
-
-
-from road import Road
-# from cross import Cross
-
-
-# def load_traffic_data(car_path=None, road_path=None, cross_path=None):
-#     """
-#     :param car_path:
-#     :param road_path:
-#     :param cross_path:
-#     :return:
-#     """
-#     car_path = '../config/car.txt'
-#     road_path = '../config/road.txt'
-#     cross_path = '../config/cross.txt'
-#     traffic_model = [list(), list()]  # 0. Roads 1.Cross
-#
-#     road_dict = dict()
-#     with open(road_path) as file:
-#         file.readline()  # remove header
-#         lines = file.readlines()
-#         generator = map(lambda x: x.strip('#()\n').split(','), lines)
-#         for line in generator:
-#             road_dict[line[0]] = Road(*line)
-#
-#     cross_list = list()
-#     with open(cross_path) as file:
-#         file.readline()
-#         lines = file.readlines()
-#         generator = map(lambda x: x.strip('#()\n').split(','), lines)
-#         for line in generator:
-#             roads = [road_dict.get(road_id, -1) for road_id in line[1:]]
-#             cross_list.append(Cross(line[0], *roads))
-#
-# load_traffic_data()
+    if cross_id == road.cross_1:
+        return road.cross_2
+    if road.two_way:
+        return road.cross_1

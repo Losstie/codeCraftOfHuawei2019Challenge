@@ -8,7 +8,7 @@ import networkx as nx
 from car import Car
 from cross import Cross
 from road import Road
-from utils import load_entities
+
 from scheduler import Scheduler
 from matplotlib import pyplot as plt
 
@@ -46,21 +46,23 @@ def load_traffic_data(car_path=None, road_path=None, cross_path=None):
             roads = [road_dict.get(road_id.strip(), None) for road_id in line[1:]]
             cross_dict[line[0]] = Cross(line[0], *roads)
 
+    car_list = list()
     with open(car_path) as file:
         file.readline()  # remove header
         lines = file.readlines()
         generator = map(lambda x: x.strip('#()\n').split(','), lines)
         for line in generator:
             car = Car(*line)
+            car_list.append(car)
             start_cross = cross_dict[line[1].strip()]
             start_cross.magic_garage[0].append(car)
 
-    return list(road_dict.values()), list(cross_dict.values())
+    return car_list, list(road_dict.values()), list(cross_dict.values())
 
 
 def driver(road_path, car_path, cross_path):
     # 初始化实体对象
-    road_list, cross_list = load_traffic_data(car_path, road_path, cross_path)
+    car_list, road_list, cross_list = load_traffic_data(car_path, road_path, cross_path)
 
     # 初始化有向图
     G = nx.DiGraph()
@@ -79,14 +81,15 @@ def driver(road_path, car_path, cross_path):
             car.graph = G
 
     # 查看有向图
-    #plot_gird(G)
+    # plot_gird(G)
 
     # 执行调度
-    sche = Scheduler(road_list, cross_list)
+    sche = Scheduler(car_list, road_list, cross_list)
     sche.run()
 
+
 if __name__ == '__main__':
-    road_path = '../config/road_test.txt'
-    car_path = '../config/car_test.txt'
-    cross_path = '../config/cross_test.txt'
+    road_path = '../config/road.txt'
+    car_path = '../config/car.txt'
+    cross_path = '../config/cross.txt'
     driver(road_path, car_path, cross_path)

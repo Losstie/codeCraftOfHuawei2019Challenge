@@ -30,6 +30,7 @@ class Car():
         self.v = self.v_max  # 当前小车速度
         self.lane_left = 0  # 小车距离车道末端的距离
 
+        self.road_id = None # 小车所处的道路id
         self.lane_dis = 0  # 小车在当前车道上的位置
         self.access_dis = 0  # 小车在当前车道的可行驶距离
         self.next_car = self  # 双向循环链表，小车前方车辆
@@ -37,11 +38,12 @@ class Car():
         self.stat = 'wait'  # 标志小车在某个时间片的状态
 
         self.graph = None
+        self.before_cross_id = int(loc) # 小车之前所在路口
         self.next_cross_id = None  # 小车在下一个路口会选择道路, None表示不出路口
 
     def __str__(self):
-        return """ car_id:{}, stat:{}, next_cross_id:{}, car_v:{}, lane_dis:{}, loc:{}, lane_left:{}, access_dis:{}
-        """.format(self.car_id, self.stat, self.next_cross_id, self.v, self.lane_dis, self.loc, self.lane_left, self.access_dis)
+        return """ car_id:{}, stat:{}, next_cross_id:{}, car_v:{}, lane_dis:{}, loc:{}, lane_left:{}, access_dis:{}, road_id:{}
+        """.format(self.car_id, self.stat, self.next_cross_id, self.v, self.lane_dis, self.loc, self.lane_left, self.access_dis, self.road_id)
 
     @property
     def has_reached(self):
@@ -60,12 +62,9 @@ class Car():
         4.前方有阻挡车辆，阻挡车辆的状态为待行驶状态，则将小车状态标志为：等待行驶
         :return:
         """
-        #print('current_path:', self.path)
-        #print('run car.update_stat!!!')
         can_run_a_moment = self.access_dis >= self.v * 1
         if self.next_car.car_id == self.car_id:
             if can_run_a_moment:
-                print('直行','update_Stat ', can_run_a_moment, self)
                 self.stat = 'finial'  # 1
                 self.lane_dis += self.v
                 self.lane_left -= self.v
@@ -75,7 +74,6 @@ class Car():
             else:
                 # 即将出路口
                 self.stat = 'wait'  # 2
-                print('出路口，update_Stat ',can_run_a_moment,self)
                 self.update_route()
         else:
             if can_run_a_moment:
@@ -98,9 +96,6 @@ class Car():
             else:
                 self.stat = 'wait'  # 4
 
-        #print(self.lane_dis, self.lane_left, self.access_dis)
-        #print(self.stat)
-
     def run_to_edge(self):
         """将小车开至车道边缘, 并调度同一条道路之后的小车"""
         car = self
@@ -119,14 +114,9 @@ class Car():
         根据动态图,更新下一条经过的道路
         """
         path = nx.dijkstra_path(self.graph, source=self.loc, target=self.dest, weight='weight')
-        print('loc', self.loc)
-        print('self.path', self.path)
-        print('nx_path',path)
-#        print(path[1])
-        #
-        self.next_cross_id = path[1] if len(path) != 1 else path[0]
-        self.loc = self.next_cross_id
-        self.path.append(self.next_cross_id)
+        if len(path) != 1:
+            self.next_cross_id = path[1]
+            self.path.append(self.next_cross_id)
 
     def run_out_current_road(self):
         """
