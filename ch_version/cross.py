@@ -91,8 +91,11 @@ class Cross():
 
                     # 到达目标路口
                     if self.id == car.dest:
+
                         car.arrived = True
-                        car.real_time = current_moment
+           
+                        car.arrive_time = current_moment
+
 
                         arrived_cars_num += 1
                         self.magic_garage[1].append(car)
@@ -199,8 +202,13 @@ class Cross():
                 assert not next_road is None, '小车出发地和目的地重合'
                 is_success, info = next_road.push_a_car(car, self.id, from_garage=True)
                 if is_success:
+
                     if car.car_id == 10951:
                         print('开始出发:', car)
+
+                    car.real_time = moment # 记录实际出发时间
+                    print(car,"start")
+
                     self.magic_garage[0].remove(car)
                 else:
                     continue
