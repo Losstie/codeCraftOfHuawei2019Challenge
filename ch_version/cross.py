@@ -46,11 +46,15 @@ class Cross():
                 continue
             export_road.append((road.road_id, di_road))
 
+        if self.id == 14 and current_moment==7:
+            print()
+
         # 每一条道路对应的非空调度序列
-        road_queues = list(filter(lambda x: len(x[1]) != 0, map(lambda x: (x[0],x[1].scheduler_queue), export_road)))
+        road_queues = list(
+            filter(lambda x: len(x[1]) != 0, map(lambda x: (x[0], x[1].scheduler_queue_test), export_road)))
         all_queues_num = len(road_queues)
 
-        if all_queues_num == 0: # 没有调度的车辆
+        if all_queues_num == 0:  # 没有调度的车辆
             return False, 0
 
         has_wait_car, arrived_cars_num = self.__run(all_queues_num, road_queues, current_moment)
@@ -68,54 +72,71 @@ class Cross():
             for idx, road_queue in enumerate(road_queues):
                 road_id, queue = road_queue
 
+                # 如果已经调度完成或者处于冲突状态，则不需要在调度
+                if idx in conflict_lane_ls + finished_lane_ls:
+                    continue
+
                 # 如果队列为空，则说明全部调度完毕
                 if len(queue) == 0:
                     finished_lane_ls.append(idx)
                     continue
 
-                # 如果已经调度完成或者处于冲突状态，则不需要在调度
-                if idx in conflict_lane_ls + finished_lane_ls:
-                    continue
-
-                for car in queue:
+                del_cars = list()
+                for ix, car in enumerate(queue):
+                    if car.car_id==10951:
+                        print('在路口{}进行调度'.format(self.id), car)
                     if car.stat == 'finial':
-                        queue.remove(car)
+                        del_cars.append(car)
                         continue
 
                     # 到达目标路口
                     if self.id == car.dest:
+                        car.arrived = True
                         car.real_time = current_moment
 
                         arrived_cars_num += 1
                         self.magic_garage[1].append(car)
-                        queue.remove(car)  # 将小车从调度队列中移除
+                        del_cars.append(car)
+                        ### 如果当前小车为最后一辆小车，则应该将当前优先级变为None
+                        first_order_car[idx] = None
 
                         car.run_out_current_road()
-                        self.roads_dict[road_id].pull_a_car(car,self.id)
+                        self.roads_dict[road_id].pull_a_car(car, self.id, is_arrived=True)
                         continue
 
                     # 当前小车为该车道优先级最高的车辆
                     # 检测小车是否能通过路口, 若不能，则调度其他路口
                     first_order_car[idx] = car
+
                     if self.has_conflict(idx, first_order_car):
                         break
                     else:
                         # 获取下一条道路信息
                         next_road = None
-                        next_cross = car.next_cross_id # 这里的小车一定会过路口，因此会有这个属性
+                        next_cross = car.next_cross_id  # 这里的小车一定会过路口，因此会有这个属性
                         for road in self.roads_dict.values():
                             if next_cross in [road.cross_1, road.cross_2]:
                                 next_road = road
 
                         is_success, info = next_road.push_a_car(car, self.id)
                         if is_success:
-                            queue.remove(car)
+                            del_cars.append(car)
                             self.roads_dict[road_id].pull_a_car(car, self.id)
                         elif info == 'road limit':
-                            car.run_to_edge()
-                            queue.remove(car)
+                            car.run_to_edge_test()
+                            del_cars.append(car)
                         else:
                             conflict_lane_ls.append(idx)
+                            first_order_car[idx] = None
+                            print('conflict_cross:', self.id)
+                            break
+
+                for car in del_cars:
+                    queue.remove(car)
+
+                if len(queue) == 0:  # 该条道路调度完成
+                    finished_lane_ls.append(idx)
+                    first_order_car[idx] = None
 
             finished_lane_num = len(finished_lane_ls)
             conflict_lane_num = len(conflict_lane_ls)
@@ -134,11 +155,18 @@ class Cross():
         :param first_order_car:  各个路口中优先级最高的车辆
         :return: True or False， True: 当前小车不可行， False:当前小车可行
         """
+        # try:
+        #print('-------')
+        #print(self.id)
+        dir_ls = list(map(lambda x: self.direct_dict[x] if x is not None else 'None',
+                          [(car.before_cross_id, car.next_cross_id) if car is not None else None for car in first_order_car]))
+        # except:
+        #       print(self.id, first_order_car[idx])
 
-        dir_ls = list(map(lambda x: self.direct_dict[x],
-                            [(car.before_cross_id, car.next_cross_id) for car in first_order_car]))
         aim_car_dir = dir_ls[idx]
         dir_ls.pop(idx)
+        while 'None' in dir_ls: dir_ls.remove('None')
+
         if aim_car_dir == 'straight':  # 小车直行则不发生冲突
             return False
         elif 'straight' in dir_ls:  # 小车左转或右转，但是其他车辆存在直行，则发生冲突
@@ -149,7 +177,6 @@ class Cross():
             return True
         else:  # 小车右转，其他车辆都右转，则不会发生冲突
             return False
-        #return False
 
     def run_car_in_magic_garage(self, moment):
         """
@@ -160,7 +187,8 @@ class Cross():
         """
         for car in self.magic_garage[0]:
             if car.sche_time <= moment:
-                car.update_route()
+                if car.next_cross_id is None:
+                    car.update_route()
 
                 # 获取下一条道路信息
                 next_road = None
@@ -169,8 +197,10 @@ class Cross():
                     if next_cross in [road.cross_1, road.cross_2]:
                         next_road = road
                 assert not next_road is None, '小车出发地和目的地重合'
-                is_success, info = next_road.push_a_car(car, self.id)
+                is_success, info = next_road.push_a_car(car, self.id, from_garage=True)
                 if is_success:
+                    if car.car_id == 10951:
+                        print('开始出发:', car)
                     self.magic_garage[0].remove(car)
                 else:
                     continue

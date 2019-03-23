@@ -54,6 +54,11 @@ def direct_relat_other_test(cross_id, roads_enumer):
                 direct_dict[(c1, c2)] = 'left'
             else:
                 direct_dict[(c1, c2)] = 'straight'
+        # 其他路口抵达当前路口
+        direct_dict[(c1, cross_id)] = 'straight'
+
+    if cross_id == 12:
+        print(direct_dict)
     return direct_dict
 
 def conver_to_cross(cross_id, road):
@@ -65,5 +70,5 @@ def conver_to_cross(cross_id, road):
     """
     if cross_id == road.cross_1:
         return road.cross_2
-    if road.two_way:
+    else:
         return road.cross_1
