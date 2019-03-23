@@ -41,7 +41,7 @@ class Scheduler():
         # 知道所有小车到达所有目的地
         while self.cars_in_traffic != 0:
             self.moment += 1
-            print(self.moment)
+            print('moment: ',self.moment)
             # 将所有的小车状态标为等待行驶，开始调度道路
             for road in self.roads:
                 road.run_moment()

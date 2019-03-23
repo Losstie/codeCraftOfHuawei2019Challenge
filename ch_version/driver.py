@@ -57,6 +57,10 @@ def load_traffic_data(car_path=None, road_path=None, cross_path=None):
             start_cross = cross_dict[line[1].strip()]
             start_cross.magic_garage[0].append(car)
 
+    # 按出发时间和车辆id排序
+    for cross in cross_dict.values():
+        cross.magic_garage[0] = sorted(cross.magic_garage[0], key=lambda x:(x.sche_time,x.car_id))
+
     return car_list, list(road_dict.values()), list(cross_dict.values())
 
 
@@ -75,10 +79,13 @@ def driver(road_path, car_path, cross_path):
         if road.two_way:
             G.add_edge(road.cross_2, road.cross_1, weight=road.weight_in_graph(road.cross_2))
 
-    # 将全局动态图插入汽车对象中
-    for cross in cross_list:
-        for car in cross.magic_garage[0]:
-            car.graph = G
+    # 将全局动态图插入汽车对象中, 用于规划路线
+    for car in car_list:
+        car.graph = G
+
+    # 将全局动态图插入道路对象中，用于更新动态图
+    for road in road_list:
+        road.graph = G
 
     # 查看有向图
     # plot_gird(G)
@@ -89,7 +96,11 @@ def driver(road_path, car_path, cross_path):
 
 
 if __name__ == '__main__':
-    road_path = '../config/road.txt'
-    car_path = '../config/car.txt'
-    cross_path = '../config/cross.txt'
+    # road_path = '../config/road.txt'
+    # car_path = '../config/car.txt'
+    # cross_path = '../config/cross.txt'
+
+    road_path = '../SDK_python/CodeCraft-2019/config_1/road.txt'
+    car_path = '../SDK_python/CodeCraft-2019/config_1/car.txt'
+    cross_path = '../SDK_python/CodeCraft-2019/config_1/cross.txt'
     driver(road_path, car_path, cross_path)
