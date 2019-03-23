@@ -2,8 +2,8 @@
 # -*- coding:utf-8 -*-
 """
 @project: codeCraftOfHuawei2019Challenge
-@file:cross.py.py
+@file:generator.py
 @author: dujiahao
-@create_time: 2019/3/20 13:58
+@create_time: 2019/3/21 21:12
 @description:
 """
