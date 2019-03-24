@@ -5,7 +5,7 @@ Created on 2019/3/11 下午6:45
 @author: Evan Chen
 """
 import networkx as nx
-from car import Car
+from Car import Car
 from cross import Cross
 from road import Road
 from utils import load_entities
