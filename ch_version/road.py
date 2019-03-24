@@ -41,7 +41,7 @@ class Road():
         """
         运动一个时刻，改变所有道路上的小车状态
         """
-        self.update_graph()
+        #self.update_graph()
         for di_road in self.di_roads:
             di_road.run()
 
@@ -53,9 +53,7 @@ class Road():
         self.graph[self.cross_1][self.cross_2]['weight'] = self.di_roads[0].di_rweight_in_graph
         if self.two_way:
             self.graph[self.cross_2][self.cross_1]['weight'] = self.di_roads[1].di_rweight_in_graph
-        # self.graph[self.cross_1][self.cross_2]['weight'] = 1
-        # if self.two_way:
-        #     self.graph[self.cross_2][self.cross_1]['weight'] = 1
+
 
     def push_a_car(self, car, cross_id, from_garage=False):
         """
@@ -226,20 +224,20 @@ class DiRoad():
                 current_car.stat = 'wait'
                 current_car = current_car.behind_car
 
-            if hp_car.car_id == 10951:
-                print('在原路直行：', hp_car)
+            # if hp_car.car_id == 10951:
+            #     print('在原路直行：', hp_car)
 
             # 开始调度
             hp_car.update_stat()
             hp_car.schedule_behind_car()
 
-            current_car = hp_car.next_car
-            # if hp_car.car_id == 10951:
-            #     print('在原路直行：', hp_car)
-            while current_car.car_id != hp_car.car_id:
-                if current_car.car_id == 10951:
-                    print('在原路直行：', current_car)
-                current_car = current_car.next_car
+            # current_car = hp_car.next_car
+            # # if hp_car.car_id == 10951:
+            # #     print('在原路直行：', hp_car)
+            # while current_car.car_id != hp_car.car_id:
+            #     if current_car.car_id == 10951:
+            #         print('在原路直行：', current_car)
+            #     current_car = current_car.next_car
 
     @property
     def scheduler_queue_test(self):

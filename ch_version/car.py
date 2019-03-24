@@ -24,7 +24,6 @@ class Car():
         self.car_id = int(car_id)
         self.sche_time = int(sche_time)
         self.real_time = int(sche_time)  # 小车实际出发时间
-        self.arrive_time = None # 小车到达目的地时间
 
         # 动态属性
         self.path = list([self.loc])  # 记录经过的路径
@@ -114,7 +113,13 @@ class Car():
         """
         根据动态图,更新下一条经过的道路
         """
+        if self.before_cross_id != self.loc and (self.loc, self.before_cross_id) in self.graph.in_edges:
+            w = self.graph[self.loc][self.before_cross_id]['weight']
+            self.graph[self.loc][self.before_cross_id]['weight'] = 100
         path = nx.dijkstra_path(self.graph, source=self.loc, target=self.dest, weight='weight')
+        if self.before_cross_id != self.loc and (self.loc, self.before_cross_id) in self.graph.in_edges:
+            self.graph[self.loc][self.before_cross_id]['weight'] = w
+
         if len(path) != 1:
             self.next_cross_id = path[1]
             self.path.append(self.next_cross_id)

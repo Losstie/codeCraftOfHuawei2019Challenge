@@ -100,7 +100,7 @@ if __name__ == '__main__':
     # car_path = '../config/car.txt'
     # cross_path = '../config/cross.txt'
 
-    road_path = '../SDK_python/CodeCraft-2019/config_1/road.txt'
-    car_path = '../SDK_python/CodeCraft-2019/config_1/car.txt'
-    cross_path = '../SDK_python/CodeCraft-2019/config_1/cross.txt'
+    road_path = '../SDK_python/CodeCraft-2019/config_2/road.txt'
+    car_path = '../SDK_python/CodeCraft-2019/config_2/car.txt'
+    cross_path = '../SDK_python/CodeCraft-2019/config_2/cross.txt'
     driver(road_path, car_path, cross_path)

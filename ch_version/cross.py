@@ -46,8 +46,8 @@ class Cross():
                 continue
             export_road.append((road.road_id, di_road))
 
-        if self.id == 14 and current_moment==7:
-            print()
+        # if self.id == 14 and current_moment==7:
+        #     print()
 
         # 每一条道路对应的非空调度序列
         road_queues = list(
@@ -55,15 +55,16 @@ class Cross():
         all_queues_num = len(road_queues)
 
         if all_queues_num == 0:  # 没有调度的车辆
-            return False, 0
+            return False, 0, []
 
-        has_wait_car, arrived_cars_num = self.__run(all_queues_num, road_queues, current_moment)
-        return has_wait_car, arrived_cars_num
+        has_wait_car, arrived_cars_num, conflict_car_ls = self.__run(all_queues_num, road_queues, current_moment)
+        return has_wait_car, arrived_cars_num, conflict_car_ls
 
     def __run(self, all_queues_num, road_queues, current_moment):
         arrived_cars_num = 0
         finished_lane_ls = list()  # 完成调度的车道
         conflict_lane_ls = list()  # 因其他车道未调度，导致当前无法调度的车道
+        conflict_car_ls = list() # 记录发生冲突的车辆id
 
         # 每一个出口道路对应的优先级最高的车辆
         first_order_car = [q[0] for _, q in road_queues]
@@ -83,19 +84,16 @@ class Cross():
 
                 del_cars = list()
                 for ix, car in enumerate(queue):
-                    if car.car_id==10951:
-                        print('在路口{}进行调度'.format(self.id), car)
+                    # if car.car_id==10951:
+                    #     print('在路口{}进行调度'.format(self.id), car)
                     if car.stat == 'finial':
                         del_cars.append(car)
                         continue
 
                     # 到达目标路口
                     if self.id == car.dest:
-
                         car.arrived = True
-           
-                        car.arrive_time = current_moment
-
+                        car.real_time = current_moment
 
                         arrived_cars_num += 1
                         self.magic_garage[1].append(car)
@@ -129,9 +127,10 @@ class Cross():
                             car.run_to_edge_test()
                             del_cars.append(car)
                         else:
+                            conflict_car_ls.append(car.car_id)
                             conflict_lane_ls.append(idx)
                             first_order_car[idx] = None
-                            print('conflict_cross:', self.id)
+                            # print('conflict_cross:', self.id)
                             break
 
                 for car in del_cars:
@@ -149,7 +148,7 @@ class Cross():
                 has_movable_car = True
 
         has_wait_car = True if len(conflict_lane_ls) != 0 else False
-        return has_wait_car, arrived_cars_num
+        return has_wait_car, arrived_cars_num, conflict_car_ls
 
     def has_conflict(self, idx, first_order_car):
         """
@@ -202,13 +201,8 @@ class Cross():
                 assert not next_road is None, '小车出发地和目的地重合'
                 is_success, info = next_road.push_a_car(car, self.id, from_garage=True)
                 if is_success:
-
-                    if car.car_id == 10951:
-                        print('开始出发:', car)
-
-                    car.real_time = moment # 记录实际出发时间
-                    print(car,"start")
-
+                    # if car.car_id == 10951:
+                    #     print('开始出发:', car)
                     self.magic_garage[0].remove(car)
                 else:
                     continue
