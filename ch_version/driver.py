@@ -17,7 +17,7 @@ def plot_gird(G):
     position = nx.spring_layout(G)
 
     nx.draw_networkx_nodes(G, position, node_size=100, node_color="r")
-    nx.draw_networkx_edges(G, position, length=10)
+    nx.draw_networkx_edges(G, position)
     nx.draw_networkx_labels(G, position)
     plt.show()
 
@@ -88,7 +88,7 @@ def driver(road_path, car_path, cross_path):
         road.graph = G
 
     # 查看有向图
-    # plot_gird(G)
+    plot_gird(G)
 
     # 执行调度
     sche = Scheduler(car_list, road_list, cross_list)
@@ -100,7 +100,7 @@ if __name__ == '__main__':
     # car_path = '../config/car.txt'
     # cross_path = '../config/cross.txt'
 
-    road_path = '../SDK_python/CodeCraft-2019/config_2/road.txt'
-    car_path = '../SDK_python/CodeCraft-2019/config_2/car.txt'
-    cross_path = '../SDK_python/CodeCraft-2019/config_2/cross.txt'
+    road_path = r'D:\Project\codeCraftOfHuawei2019Challenge\SDK_python\CodeCraft-2019\config_3\road.txt'
+    car_path = r'D:\Project\codeCraftOfHuawei2019Challenge\SDK_python\CodeCraft-2019\config_3\car.txt'
+    cross_path = r'D:\Project\codeCraftOfHuawei2019Challenge\SDK_python\CodeCraft-2019\config_3\cross.txt'
     driver(road_path, car_path, cross_path)

@@ -7,6 +7,7 @@ Created on 2019/3/13 下午1:55
 from datetime import datetime
 from functools import reduce
 import time
+import random
 
 
 class Scheduler():
@@ -37,12 +38,15 @@ class Scheduler():
         根据算法确定每个小车的运行路线
         :return:
         """
-        s = datetime.now()
+        s = time.time()
+
+        # slow star
+        CongestionWindow = len(self.crosses)
         # 一次循环执行一个时间片段内小车调度
         # 知道所有小车到达所有目的地
         while self.cars_in_traffic != 0:
             self.moment += 1
-            print('moment: ', self.moment)
+            print('moment: ', self.moment, self.cars_in_traffic,CongestionWindow)
             # 将所有的小车状态标为等待行驶，开始调度道路
             for road in self.roads:
                 road.run_moment()
@@ -50,12 +54,22 @@ class Scheduler():
             # 循环调度待行驶车辆与路口
             pre_conflict_crosses = list()
             has_car_in_wait = True
+
             while has_car_in_wait:
                 # [(当前路口是否存在未调度车辆：{True, False} , 本次运行抵达该路口有多少辆, 发生冲突的车辆id),..,..]
                 status = [cross.run_a_time(self.moment) for cross in self.crosses]
 
                 # 统计到达路口的车辆
                 car_arrived_cross = reduce(lambda z, y: z + y, map(lambda x: x[1], status))
+
+                # 增加速度
+                if CongestionWindow <= 1000:
+                    if car_arrived_cross >= 10:
+                        CongestionWindow += car_arrived_cross
+                else:
+                    if car_arrived_cross>=1:
+                        CongestionWindow += 1
+
                 self.cars_in_traffic -= car_arrived_cross
 
                 # 判断是否需要循环调度
@@ -67,17 +81,25 @@ class Scheduler():
                 if self.is_lock(pre_conflict_crosses, conflict_crosses):
                     car_id_ls = reduce(lambda x, y: x + y, map(lambda x: x[2], status))
                     self.re_route_path(car_id_ls)
+                    CongestionWindow = int(CongestionWindow / 2)
+                    print("窗口大小：%s",CongestionWindow)
+
                 pre_conflict_crosses = conflict_crosses
 
+
             # 调度存储于cross中的车辆
+            # 出发车辆控制
+            driveCar = 0
             for cross in self.crosses:
-                cross.run_car_in_magic_garage(self.moment)
+                if driveCar>= CongestionWindow:
+                    break
+                driveCar += cross.run_car_in_magic_garage(self.moment)
 
         self.get_path()
 
-        e = datetime.now()
+        e = time.time()
         print('调度所有小车到达终点，总共运行：' + str(self.moment) + '时刻！')
-        print('调度程序总共运行：{}s'.format((e - s).seconds))
+        print('调度程序总共运行：{}s'.format((e - s)))
 
     def is_lock(self, pre, new):
         """
@@ -124,6 +146,10 @@ class Scheduler():
                 continue
 
             # 重新规划道路
-            c_car.next_cross_id = candidate_cross.pop()
+            candidate_cross_list = list(candidate_cross)
+            visitedIndex = random.randint(0,len(candidate_cross_list)-1)
 
+
+            # c_car.next_cross_id = candidate_cross.pop()
+            c_car.next_cross_id = candidate_cross_list.pop(visitedIndex)
 

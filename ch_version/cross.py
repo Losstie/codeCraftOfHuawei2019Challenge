@@ -187,6 +187,7 @@ class Cross():
         :param graph: 动态道路图
         :return:
         """
+        _sum = 0
         for car in self.magic_garage[0]:
             if car.sche_time <= moment:
                 if car.next_cross_id is None:
@@ -204,10 +205,12 @@ class Cross():
                     # if car.car_id == 10951:
                     #     print('开始出发:', car)
                     self.magic_garage[0].remove(car)
+                    _sum += 1
                 else:
                     continue
             else:
                 continue
+        return _sum
 
     def __str__(self):
         return 'Commander at {}'.format(self.id)
