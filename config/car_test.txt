@@ -1,2 +1,0 @@
-#(id,from,to,speed,planTime)
-(10000, 31, 21, 6, 1)

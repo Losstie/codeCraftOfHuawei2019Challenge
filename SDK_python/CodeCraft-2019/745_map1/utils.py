@@ -7,24 +7,15 @@ Created on 2019/3/14 上午10:19
 
 
 def direct_relat_other(cross_id, roads_enumer):
-    """
-    输入与路口按照顺时针相连的四个道路对象
-    输出为方向字典
-    key：（roud_1, roud_2） value: {left, right, straight，unreachable}
 
-    :param cross_id: 路口唯一标识
-    :param roads: (1, road_1), (2, road_2), (3, road_3), (4, road_4)
-    :return:
-    """
     roads = list(filter(lambda x: x[1] is not None, roads_enumer))
     direct_dict = dict()
     for l1, r1 in roads:
         for l2, r2 in roads:
             if r1.road_id == r2.road_id:
                 continue
-            # r1 --> r2， 可以行驶
-            r1_flag = r1.two_way or (cross_id == r1.corss_2)  # r1为双向道路，或者r1的终点路口为当前路口
-            r2_flag = r2.two_way or (cross_id == r2.corss_1)  # r2为双向道路，或者r2的起始路口为当前路口
+            r1_flag = r1.two_way or (cross_id == r1.corss_2)
+            r2_flag = r2.two_way or (cross_id == r2.corss_1)
 
             if r1_flag and r2_flag:
                 if (l1, l2) in [(1, 4), (4, 3), (3, 2), (2, 1)]:
@@ -54,20 +45,14 @@ def direct_relat_other_test(cross_id, roads_enumer):
                 direct_dict[(c1, c2)] = 'left'
             else:
                 direct_dict[(c1, c2)] = 'straight'
-        # 其他路口抵达当前路口
         direct_dict[(c1, cross_id)] = 'straight'
 
-    if cross_id == 12:
-        print(direct_dict)
+    # if cross_id == 12:
+        # print(direct_dict)
     return direct_dict
 
 def conver_to_cross(cross_id, road):
-    """
-    cross_id -> road 所属方向
-    :param cross_id:
-    :param road:
-    :return:
-    """
+
     if cross_id == road.cross_1:
         return road.cross_2
     else:
