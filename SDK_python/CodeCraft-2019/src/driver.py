@@ -10,7 +10,7 @@ from car import Car
 from cross import Cross
 from road import Road
 from scheduler import Scheduler
-
+CROSS_DICT = None
 
 
 # def plot_gird(G):
@@ -40,14 +40,16 @@ def load_traffic_data(car_path=None, road_path=None, cross_path=None):
         for line in generator:
             roads = [road_dict.get(road_id.strip(), None) for road_id in line[1:]]
             cross_dict[line[0]] = Cross(line[0], *roads)
-
+    _CROSS = list(cross_dict.values())
+    _CROSS = list(sorted(_CROSS, key=lambda x: x.id))
+    CROSS_DICT = dict([(cross.id, cross) for cross in _CROSS])
     car_list = list()
     with open(car_path) as file:
         file.readline()  # remove header
         lines = file.readlines()
         generator = map(lambda x: x.strip('#()\n').split(','), lines)
         for line in generator:
-            car = Car(*line)
+            car = Car(*line,CROSS_DICT=CROSS_DICT)
             car_list.append(car)
             start_cross = cross_dict[line[1].strip()]
             start_cross.magic_garage[0].append(car)

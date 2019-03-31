@@ -7,8 +7,9 @@ Created on 2019/3/14
 
 import nx
 
+
 class Car():
-    def __init__(self, car_id, loc, dest, v_max, sche_time):
+    def __init__(self, car_id, loc, dest, v_max, sche_time,CROSS_DICT=None):
 
         self.loc = int(loc)
         self.dest = int(dest)
@@ -17,7 +18,7 @@ class Car():
         self.sche_time = int(sche_time)
         self.real_time = int(sche_time)
 
-
+        self.CROSS_DICT = CROSS_DICT
         self.path = list([self.loc])
         self.v = self.v_max
         self.lane_left = 0
@@ -30,6 +31,7 @@ class Car():
         self.next_car = self
         self.behind_car = self
         self.stat = 'wait'
+        self.signal = None
 
         self.arrived = False
         self.graph = None
@@ -86,14 +88,53 @@ class Car():
         self.access_dis = 0
         self.lane_left = 0
 
+    # def update_route(self):
+    #
+    #     if self.before_cross_id != self.loc and (self.loc, self.before_cross_id) in self.graph.in_edges:
+    #         w = self.graph[self.loc][self.before_cross_id]['weight']
+    #         self.graph[self.loc][self.before_cross_id]['weight'] = 1000
+    #     path = nx.dijkstra_path(self.graph, source=self.loc, target=self.dest, weight='weight')
+    #     if self.before_cross_id != self.loc and (self.loc, self.before_cross_id) in self.graph.in_edges:
+    #         self.graph[self.loc][self.before_cross_id]['weight'] = w
+    #
+    #     if len(path) != 1:
+    #         self.next_cross_id = path[1]
+    #         self.path.append(self.next_cross_id)
+    #     else:
+    #         self.next_cross_id = path[0]
+
     def update_route(self):
+        s_cross_id = None
+        if self.next_cross_id is not None:
+            cross = self.CROSS_DICT[self.loc]
+            candidate_cross = set()
+            for road in cross.roads_dict.values():
+                if self.loc == road.cross_1:
+                    candidate_cross.add(road.cross_2)
+                if self.loc == road.cross_2 and road.two_way:
+                    candidate_cross.add(road.cross_1)
+            forbid = {self.next_cross_id, self.before_cross_id}
+            candidate_cross -= forbid
+            candidate_cross = list(candidate_cross)
+            if len(candidate_cross) != 0:
+                choose = [(self.before_cross_id,c) for c in candidate_cross]
+
+                dir_ls = list(map(lambda x: cross.direct_dict[x] if x is not None else 'None',choose))
+                if "straight" in dir_ls:
+                    s_cross_id = candidate_cross[dir_ls.index("straight")]
+            if s_cross_id is not None:
+                w_s = self.graph[self.loc][s_cross_id]["weight"]
+                self.graph[self.loc][s_cross_id]["weight"] = w_s * 0.8
 
         if self.before_cross_id != self.loc and (self.loc, self.before_cross_id) in self.graph.in_edges:
             w = self.graph[self.loc][self.before_cross_id]['weight']
             self.graph[self.loc][self.before_cross_id]['weight'] = 1000
+
         path = nx.dijkstra_path(self.graph, source=self.loc, target=self.dest, weight='weight')
         if self.before_cross_id != self.loc and (self.loc, self.before_cross_id) in self.graph.in_edges:
             self.graph[self.loc][self.before_cross_id]['weight'] = w
+        if s_cross_id is not None:
+            self.graph[self.loc][s_cross_id]["weight"] = w_s
 
         if len(path) != 1:
             self.next_cross_id = path[1]

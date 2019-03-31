@@ -64,7 +64,6 @@ def dijkstra_path(graph,source, target, weight='weight') :
     start = source
     end = target
 
-
     dist = {}
     previous = {}
     for v in graph.node:

@@ -34,55 +34,62 @@ class Scheduler():
         s = time.time()
 
         # slow star
-        CongestionWindow = 15
-
+        per_cwnd = 2
+        ssh = 4
+        control_nums_departures = int(len(self.crosses)*4)
+        occur_lock = False
+        occur_lock_time = 0
+        first_time = True
+        inter_val = 3
         while self.cars_in_traffic != 0:
             self.moment += 1
 
-            print('moment: ', self.moment, self.cars_in_traffic, CongestionWindow)
-
+            print('moment: ',self.moment, self.cars_in_traffic,per_cwnd,first_time)
 
             for road in self.roads:
                 road.run_moment()
 
-
             pre_conflict_crosses = list()
-
-            conflict_cross_dict = {}
             has_car_in_wait = True
             while has_car_in_wait:
                 status = [cross.run_a_time(self.moment) for cross in self.crosses]
-
                 car_arrived_cross = reduce(lambda z, y: z + y, map(lambda x: x[1], status))
-
-                # if CongestionWindow <= 100:
-                #     if car_arrived_cross >= 10:
-                #         CongestionWindow += 2
-                # else:
-                #     if car_arrived_cross >= 1:
-                #         CongestionWindow += 1
-
-
                 self.cars_in_traffic -= car_arrived_cross
-
                 has_car_in_wait = reduce(lambda z, y: z or y, map(lambda x: x[0], status))
-
                 conflict_crosses = list(map(lambda x: x[0], filter(lambda x: x[1][0] is True, enumerate(status))))
+
+                if (self.moment-occur_lock_time)>inter_val and not first_time:
+                    occur_lock = False
+                    if car_arrived_cross>0:
+                        if per_cwnd<ssh:
+                            per_cwnd += 1
+
                 if self.is_lock(pre_conflict_crosses, conflict_crosses):
                     car_id_ls = reduce(lambda x, y: x + y, map(lambda x: x[2], status))
+                    print("dead_lock", conflict_crosses)
+                    print("conflict_car_nums",len(car_id_ls))
                     self.re_route_path(car_id_ls)
+                    per_cwnd = 0
+                    occur_lock = True
+                    occur_lock_time = self.moment
 
-                    CongestionWindow = CongestionWindow// 2
 
-                pre_conflict_crosses = conflict_crosses
+                pre_conflict_crosses = [_ for _ in conflict_crosses]
 
-            driveCar = 0
-            for cross in self.crosses:
-                if driveCar >= CongestionWindow:
-                    break
-                driveCar += cross.run_car_in_magic_garage(self.moment)
 
             self.update_graph()
+
+            nums_of_drive_out_garage = 0
+            if not occur_lock:
+                for cross in self.crosses:
+                    if nums_of_drive_out_garage >= control_nums_departures:
+                        break
+                    nums_of_drive_out_garage += cross.run_car_in_magic_garage(self.moment,per_cwnd)
+            print(self.moment,"发车数量",nums_of_drive_out_garage)
+            if first_time:
+                first_time = False
+
+            # self.update_graph()
 
         # self.get_path()
         e = time.time()

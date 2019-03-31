@@ -56,6 +56,14 @@ class Road():
             car.before_cross_id = car.loc
             car.loc = self.cross_2 if cross_id == self.cross_1 else self.cross_1
         return is_success, info
+    def check_a_car(self, car, cross_id):
+        di_road = self.get_di_road(cross_id, 'import')
+        run_dist = min(self.v_limit, car.v_max) - car.lane_left
+        if run_dist<=0:
+            return False
+        else:
+            may_dead_lock = di_road.check(car, run_dist)
+            return may_dead_lock
 
     def pull_a_car(self, car, cross_id, is_arrived=False):
         """
@@ -170,6 +178,25 @@ class DiRoad():
         _hp_car.next_car.is_head = False if _hp_car.next_car.car_id != _hp_car.car_id else True
         self.highest_prior_cars[lane_mark] = _hp_car
         return is_success, info
+    def check(self, car, run_dist):
+        will_dead_lock = False
+        last_car, _hp_car = None, None
+        for lane_id, hp_car in enumerate(self.highest_prior_cars):
+            if hp_car is None:
+                will_dead_lock = False
+                _hp_car = None
+                break
+            _hp_car = hp_car
+            last_car = hp_car.next_car
+            if run_dist <= last_car.lane_dis:
+                will_dead_lock = False
+                break
+            else:
+                if last_car.stat == 'wait':
+                    will_dead_lock = True
+                    break
+        return will_dead_lock
+
 
     def run(self):
         for hp_car in self.highest_prior_cars:
@@ -258,4 +285,4 @@ class DiRoad():
     @property
     def di_rweight_in_graph(self):
 
-        return self.car_num / (self.lane_len * self.lane_num)
+        return self.car_num / (self.lane_len * self.lane_num)*0.92 +  self.lane_len/100* 0.08 # +self.lane_len/self.v_max

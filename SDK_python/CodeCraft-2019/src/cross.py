@@ -42,86 +42,100 @@ class Cross():
         if all_queues_num == 0:
             return False, 0, []
 
-        has_wait_car, arrived_cars_num, conflict_car_ls = self.__run(all_queues_num, road_queues, current_moment)
+        has_wait_car, arrived_cars_num, conflict_car_ls = self.__run_test(all_queues_num, road_queues, current_moment)
         return has_wait_car, arrived_cars_num, conflict_car_ls
 
-    def __run(self, all_queues_num, road_queues, current_moment):
+    def __run_test(self, all_queues_num, road_queues, current_moment):
         arrived_cars_num = 0
-        finished_lane_ls = list()
-        conflict_lane_ls = list()
         conflict_car_ls = list()
-
-        first_order_car = [q[0] for _, q in road_queues]
+        has_car_wait = False
+        road_queues = list(filter(lambda x:len(x[1])!=0,road_queues))
         has_movable_car = True
         while has_movable_car:
-            for idx, road_queue in enumerate(road_queues):
-                road_id, queue = road_queue
-
-                if idx in conflict_lane_ls + finished_lane_ls:
-                    continue
-
-                if len(queue) == 0:
-                    finished_lane_ls.append(idx)
-                    continue
-
-                del_cars = list()
-                for ix, car in enumerate(queue):
+            first_order_car = [q[0] for _, q in road_queues]
+            _filter_finial_car = list(filter(lambda x:x.stat=='finial',first_order_car))
+            if len(_filter_finial_car)!=0:
+                for idx,car in enumerate(first_order_car):
                     if car.stat == 'finial':
-                        del_cars.append(car)
-                        continue
-
-                    if self.id == car.dest:
-                        car.arrived = True
-
-                        arrived_cars_num += 1
-                        self.magic_garage[1].append(car)
-                        del_cars.append(car)
-                        first_order_car[idx] = None
-
-                        car.run_out_current_road()
-                        self.roads_dict[road_id].pull_a_car(car, self.id, is_arrived=True)
-                        continue
-
-                    first_order_car[idx] = car
-
-                    if self.has_conflict(idx, first_order_car):
-                        break
+                        road_queues[idx][1].remove(car)
+                        # if the queue have no car
+                        road_queues = list(filter(lambda x: len(x[1]) != 0, road_queues))
+                        all_queues_num = len(road_queues)
                     else:
-                        # next_road = None
-                        # next_cross = car.next_cross_id
-                        # for road in self.roads_dict.values():
-                        #     if next_cross in [road.cross_1, road.cross_2]:
-                        #         next_road = road
-                        next_road = self.next_road_dict[car.next_cross_id]
-                        is_success, info = next_road.push_a_car(car, self.id)
-                        if is_success:
-                            del_cars.append(car)
-                            self.roads_dict[road_id].pull_a_car(car, self.id)
-                        elif info == 'road limit':
-                            car.run_to_edge_test()
-                            del_cars.append(car)
-                        else:
-                            conflict_car_ls.append(car.car_id)
-                            conflict_lane_ls.append(idx)
-                            first_order_car[idx] = None
-                            break
-
-                for car in del_cars:
-                    queue.remove(car)
-
-                if len(queue) == 0:
-                    finished_lane_ls.append(idx)
-                    first_order_car[idx] = None
-
-            finished_lane_num = len(finished_lane_ls)
-            conflict_lane_num = len(conflict_lane_ls)
-            if finished_lane_num + conflict_lane_num == all_queues_num:
-                has_movable_car = False
+                        continue
             else:
-                has_movable_car = True
+                for car in first_order_car:
+                    if car.dest == self.id:
+                        continue
+                    else:
+                        next_road = self.next_road_dict[car.next_cross_id]
+                        will_dead_lock = next_road.check_a_car(car, self.id)
+                        if will_dead_lock:
+                            conflict_car_ls.append(car.car_id)
+                if len(conflict_car_ls) != 0:
+                    return True,arrived_cars_num,conflict_car_ls
+                else:
+                    aim_cross = [car.next_cross_id for car in first_order_car]
+                    dir_ls = list(map(lambda x: self.direct_dict[x] if x is not None else 'None',
+                                      [(car.before_cross_id,
+                                        car.next_cross_id) if car is not None and car.next_cross_id == a else None
+                                       for car,a
+                                       in zip(first_order_car,aim_cross)]))
+                    def convert_to_int(x):
+                        if x =='straight':
+                            return 3
+                        elif x== 'left':
+                            return 2
+                        elif x=='right':
+                            return 1
+                        else:
+                            return 0
+                    for i,c in enumerate(first_order_car):
+                        c.signal = dir_ls[i]
+                    first_order_car = sorted(first_order_car,key=convert_to_int,reverse=True)
+                    will_drive_car = first_order_car.pop(0)
+                    road_id = will_drive_car.road_id
 
-        has_wait_car = True if len(conflict_lane_ls) != 0 else False
-        return has_wait_car, arrived_cars_num, conflict_car_ls
+                    if will_drive_car.dest == self.id:
+                        arrived_cars_num += 1
+                        for idx, queue in road_queues:
+                            if idx == road_id:
+                                queue.remove(will_drive_car)
+                        road_queues = list(filter(lambda x:len(x[1])!=0,road_queues))
+                        all_queues_num = len(road_queues)
+                        self.magic_garage[1].append(car)
+                        will_drive_car.run_out_current_road()
+                        self.roads_dict[road_id].pull_a_car(will_drive_car, self.id, is_arrived=True)
+                    else:
+                        next_road = self.next_road_dict[will_drive_car.next_cross_id]
+                        is_success, info = next_road.push_a_car(will_drive_car, self.id)
+                        if is_success:
+                            for idx, queue in road_queues:
+                                if idx == road_id:
+                                    queue.remove(will_drive_car)
+                            road_queues = list(filter(lambda x:len(x[1])!=0,road_queues))
+                            all_queues_num = len(road_queues)
+                            self.roads_dict[road_id].pull_a_car(will_drive_car, self.id)
+                        elif info == 'road limit':
+                            will_drive_car.run_to_edge_test()
+                            for idx, queue in road_queues:
+                                if idx == road_id:
+                                    queue.remove(will_drive_car)
+                            road_queues = list(filter(lambda x:len(x[1])!=0,road_queues))
+                            all_queues_num = len(road_queues)
+            if all_queues_num == 0:
+                has_movable_car = False
+        return has_car_wait,arrived_cars_num,conflict_car_ls
+
+
+
+
+
+
+
+
+
+
 
     def has_conflict(self, idx, first_order_car):
 
@@ -165,18 +179,56 @@ class Cross():
     # else:
     #    continue
     # return _sum
-    def run_car_in_magic_garage(self, moment):
+    def run_car_in_magic_garage(self, moment,per_cwnd):
 
         _sum = 0
         wait_start_car = list()
+        for car in self.magic_garage[0]:
+            if car.sche_time <= moment and _sum<per_cwnd:
+                wait_start_car.append(car)
+                _sum+=1
+            else:
+                break
+        wait_start_car.sort(key=lambda x: x.car_id)
+        _sum = 0
+        for car in wait_start_car:
+            if car.next_cross_id is None:
+                car.update_route()
+
+            next_road = self.next_road_dict[car.next_cross_id]
+            is_success, info = next_road.push_a_car(car, self.id, from_garage=True)
+            if is_success:
+                car.real_time = moment
+                self.magic_garage[0].remove(car)
+                _sum += 1
+            else:
+                continue
+        return _sum
+    def run_car_in_magic_garage_test(self, moment, per_cwnd):
+        _sum = 0
+        wait_start_car = list()
+        if per_cwnd == 0:
+            return _sum
+
         for car in self.magic_garage[0]:
             if car.sche_time <= moment:
                 wait_start_car.append(car)
             else:
                 break
-        wait_start_car.sort(key=lambda x: x.car_id)
+        # wait_start_car.sort(key=lambda x: x.car_id)
+        nums = len(wait_start_car)
+        if nums == 0:
+            return _sum
+        wait_start_car.sort(key=lambda x: x.v_max,reverse=True)
 
-        for car in wait_start_car:
+        if nums >= per_cwnd:
+            start_car = wait_start_car[:per_cwnd]
+        else:
+            start_car = wait_start_car
+
+        start_car.sort(key=lambda x:x.car_id)
+
+        for car in start_car:
             if car.next_cross_id is None:
                 car.update_route()
 

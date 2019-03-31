@@ -28,10 +28,10 @@ def main():
     # cross_path = sys.argv[3]
     # answer_path = sys.argv[4]
 
-    car_path = r'D:\Project\codeCraftOfHuawei2019Challenge\SDK_python\CodeCraft-2019\config_2\car.txt'
-    road_path = r'D:\Project\codeCraftOfHuawei2019Challenge\SDK_python\CodeCraft-2019\config_2\road.txt'
-    cross_path = r'D:\Project\codeCraftOfHuawei2019Challenge\SDK_python\CodeCraft-2019\config_2\cross.txt'
-    answer_path = r'D:\Project\codeCraftOfHuawei2019Challenge\SDK_python\CodeCraft-2019\config_2\answer.txt'
+    car_path = r'D:\Project\codeCraftOfHuawei2019Challenge\SDK_python\CodeCraft-2019\config_1\car.txt'
+    road_path = r'D:\Project\codeCraftOfHuawei2019Challenge\SDK_python\CodeCraft-2019\config_1\road.txt'
+    cross_path = r'D:\Project\codeCraftOfHuawei2019Challenge\SDK_python\CodeCraft-2019\config_1\cross.txt'
+    answer_path = r'D:\Project\codeCraftOfHuawei2019Challenge\SDK_python\CodeCraft-2019\config_1\answer.txt'
     # logging.info("car_path is %s" % (car_path))
     # logging.info("road_path is %s" % (road_path))
     # logging.info("cross_path is %s" % (cross_path))
